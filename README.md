@@ -31,10 +31,10 @@ bash ./Scripts/split_genewiz_by_lane_make_input.sh
 
 This will make 3 output directories:
 1) `./Inputs` - will hold the list of inputs required to execute the tasks in parallel
-2) `./Fastq_unziped` - will hold the unziped fastq files required by the perl worker script
+2) `./Fastq_unziped` - will hold the unzipped fastq files required by the perl worker script
 3) `./Fastq_laneSplit` - will hold the output fastq files split into correct flowcell-lane pairs
 
-You will typically see 3 pairs of fastq per 'combined' input file pair. 
+You will typically see 2-3 pairs of fastq per 'combined' input file pair. If this is not the case, don't be concerned until you run the checker script, which will compare the number of input and output reads. If the checker script returns a mistmatch for any samples, you will need to carefully check the code (for example are variables correctly filled, are the read IDS matching the expected flowcell and lane pattern, etc).
 
 ### Submit the job
 
@@ -44,7 +44,7 @@ Allow 1 hugemem CPU and 30 GB RAM per parallel task. Remember that jobs requirin
 
 Less efficient strategies:
 
-- Submit all tasks on 48 CPU, as soon as a tasks completes the 49th, and then 50th will start
+- Submit all tasks on 48 CPU, and allow double the walltime. As soon as a task completes, the 49th, and then 50th, will start, leaving up to 46 idle cores while these last 2 tasks complete
 - Submit all tasks on 96 CPU, leaving 46 idle
 
 More efficient strategies:
@@ -62,14 +62,43 @@ This will launch parallel tasks of `./Scripts/split_genewiz_by_lane.sh`, which w
 
 ## Outputs
 
-Unzipped fastq in `./Fastq_unzipped` (one pair per input 'combined' pair) and new fastq file pairs in `./Fastq_laneSplit` with each fastq pair containing reads from one flowcell-lane. Expect 3 pairs of split fastq per input 'combined' fastq. 
+Unzipped fastq in `./Fastq_unzipped` (one pair per input 'combined' pair) and new fastq file pairs in `./Fastq_laneSplit` with each fastq pair containing reads from one flowcell-lane. Expect 2-3 pairs of split fastq per input 'combined' fastq. 
 
-The data will be output as unzipped, and a line count recorded. This is for the next step, which will cehck the line counts of output split fastq match that of input combined fastq.  
+The data will be output as unzipped, and a line count recorded. This is for the next step, which will check the line counts of output split fastq match that of input combined fastq.  
+
+## Run fastqc over the split output pairs
+
+See [SIH QC-tools](https://github.com/Sydney-Informatics-Hub/QC-tools) for helpful fastQC scripts. 
 
 ## Run checker
 
-Run the checking script to confirm that the split output files contain the same number of reads as the combined input files. COMING SOON. 
+Run the checking script to confirm that the split output files contain the same number of reads as the combined input files. 
 
-## QC
+This is done by comparing the line count taken from the unzipped 'combined' fastq to the number of reads reported in the fastQC outputs, summed for each flowcell-lane pair derived rom the 'combined' file.  
 
-As always, you should run fastQC over this data, see [SIH QC-tools](https://github.com/Sydney-Informatics-Hub/QC-tools) for helpful scripts. 
+Open `perl Scripts/check_lanesplit_counts.pl` and ensure that the fastq directory names match your working directory: 
+
+```
+# Directory holding the original 'combined' fastq files 
+my $unsplit_fastq_dir = './Fastq'; 
+
+# Directory holding the original 'combined' fastq files in unzipped format, and their .lineCount files
+my $unzipped_fastq_dir = './Fastq_unzipped'; 
+
+# Directory holding the output of fastQC, run over each flowcell-lane pair derived from this splitting workflow 
+my $fastqc_split_dir = './fastQC/lanesplit';
+```
+
+Save the script, then run on the login node with:
+
+```
+perl Scripts/check_lanesplit_counts.pl
+```
+
+Expected terminal output, report for each sample passing:
+
+``` 
+Splitting read count check passed for sample <sampleID>: <N> reads
+```
+
+A `SPLITTING ERROR` message will be displayed for failing samples. 
